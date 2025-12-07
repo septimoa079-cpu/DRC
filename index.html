@@ -951,13 +951,21 @@
         }
 
         function generateJobQR(jobData) {
+            // Marcar el trabajo como activo (para uso de un solo QR)
+            jobData.active = true;
+
             const qrContainer = document.createElement('div');
             qrContainer.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 30px; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.3); z-index: 2000;';
             
             const title = document.createElement('div');
-            title.textContent = 'Tu QR de Trabajo';
-            title.style.cssText = 'font-weight: bold; margin-bottom: 15px; text-align: center;';
+            title.textContent = 'Tu QR de Trabajo (Un solo uso)';
+            title.style.cssText = 'font-weight: bold; margin-bottom: 5px; text-align: center;';
             qrContainer.appendChild(title);
+
+            const subtitle = document.createElement('div');
+            subtitle.textContent = 'Se deducirá cuando alguien lo escanee';
+            subtitle.style.cssText = 'font-size: 12px; color: #999; margin-bottom: 15px; text-align: center;';
+            qrContainer.appendChild(subtitle);
 
             const qrDiv = document.createElement('div');
             qrContainer.appendChild(qrDiv);
@@ -1137,6 +1145,35 @@
                     return;
                 }
 
+                // Verificar si el trabajo ya fue aceptado por alguien
+                const users = getAllUsers();
+                const creator = users[data.creator];
+
+                if (!creator) {
+                    showAlert('Usuario creador no encontrado', 'error');
+                    return;
+                }
+
+                // Buscar si alguien ya aceptó este trabajo
+                for (const [userId, user] of Object.entries(users)) {
+                    if (user.isBank) continue;
+                    const acceptedJobs = getAcceptedJobs(userId);
+                    if (acceptedJobs.find(j => j.jobId === data.jobId)) {
+                        showAlert('Este trabajo ya fue aceptado por alguien más', 'error');
+                        return;
+                    }
+                }
+
+                // Deducir dinero del creador inmediatamente (reservar el dinero)
+                if (creator.balance < data.amount) {
+                    showAlert('El creador ya no tiene saldo suficiente', 'error');
+                    return;
+                }
+
+                creator.balance -= data.amount;
+                users[data.creator] = creator;
+                saveUsers(users);
+
                 pendingJob = data;
                 showJobConfirmation(data);
 
@@ -1162,6 +1199,18 @@
                 showAlert('Ya aceptaste este trabajo', 'error');
                 document.getElementById('jobConfirmModal').classList.remove('active');
                 return;
+            }
+
+            // Verificar que nadie más ya lo aceptó
+            const users = getAllUsers();
+            for (const [userId, user] of Object.entries(users)) {
+                if (user.isBank || userId === currentUser.userId) continue;
+                const otherAccepted = getAcceptedJobs(userId);
+                if (otherAccepted.find(j => j.jobId === pendingJob.jobId)) {
+                    showAlert('Este trabajo ya fue aceptado por otra persona', 'error');
+                    document.getElementById('jobConfirmModal').classList.remove('active');
+                    return;
+                }
             }
 
             acceptedJobs.push(pendingJob);
@@ -1191,16 +1240,15 @@
             const users = getAllUsers();
             const creator = users[job.creator];
 
-            if (!creator || creator.balance < job.amount) {
-                showAlert('El creador del trabajo no tiene saldo suficiente', 'error');
+            if (!creator) {
+                showAlert('El creador del trabajo no existe', 'error');
                 return;
             }
 
-            // Realizar transferencia
-            creator.balance -= job.amount;
+            // El dinero ya fue deducido cuando se aceptó el trabajo
+            // Solo agregar al que completó el trabajo
             currentUser.balance += job.amount;
 
-            users[job.creator] = creator;
             users[currentUser.userId] = currentUser;
             saveUsers(users);
 
@@ -1267,13 +1315,25 @@
                 return;
             }
 
+            // Deducir dinero inmediatamente cuando se genera el QR
+            currentUser.balance -= amount;
+            const users = getAllUsers();
+            users[currentUser.userId] = currentUser;
+            saveUsers(users);
+
             const transferData = {
                 type: 'drc_transfer',
                 from: currentUser.userId,
                 amount: amount,
                 id: 'txn_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
-                ts: Date.now()
+                ts: Date.now(),
+                used: false
             };
+
+            // Guardar transferencias pendientes
+            const pendingTransfers = JSON.parse(localStorage.getItem('pendingTransfers') || '[]');
+            pendingTransfers.push(transferData);
+            localStorage.setItem('pendingTransfers', JSON.stringify(pendingTransfers));
 
             // Limpiar QR anterior
             document.getElementById('qrcode').innerHTML = '';
@@ -1285,7 +1345,11 @@
                 height: 250
             });
 
-            showAlert('QR generado! Comparte con otra persona', 'success');
+            updateUserDisplay();
+            document.getElementById('transferAmount').value = '';
+            document.getElementById('transferPreview').style.display = 'none';
+
+            showAlert(`QR generado! Se deducieron $${amount.toFixed(2)} de tu cuenta. Comparte el QR.`, 'success');
         }
 
         function downloadQR() {
@@ -1416,19 +1480,31 @@
                 return;
             }
 
-            if (sender.balance < pendingTransfer.amount) {
-                showAlert('El emisor no tiene saldo suficiente', 'error');
+            // Marcar el QR como usado
+            const pendingTransfers = JSON.parse(localStorage.getItem('pendingTransfers') || '[]');
+            const transferIndex = pendingTransfers.findIndex(t => t.id === pendingTransfer.id);
+            
+            if (transferIndex === -1) {
+                showAlert('QR inválido o expirado', 'error');
                 document.getElementById('confirmModal').classList.remove('active');
                 return;
             }
 
-            // Deducir del emisor
-            sender.balance -= pendingTransfer.amount;
-            // Agregar al receptor
+            if (pendingTransfers[transferIndex].used) {
+                showAlert('Este QR ya fue utilizado', 'error');
+                document.getElementById('confirmModal').classList.remove('active');
+                return;
+            }
+
+            // Marcar como usado
+            pendingTransfers[transferIndex].used = true;
+            localStorage.setItem('pendingTransfers', JSON.stringify(pendingTransfers));
+
+            // Ya se dedujo del emisor cuando se generó el QR
+            // Solo agregar al receptor ahora
             currentUser.balance += pendingTransfer.amount;
 
-            // Guardar ambos usuarios
-            users[pendingTransfer.from] = sender;
+            // Guardar receptor
             users[currentUser.userId] = currentUser;
             saveUsers(users);
 
