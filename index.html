@@ -1,0 +1,1613 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Banco DRC - Wallet Local</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 10px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            width: 100%;
+            max-width: 500px;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            position: relative;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+
+        .header .saldo {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .bank-button {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid white;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.3s;
+        }
+
+        .bank-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 15px;
+            border: none;
+            background: none;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            color: #999;
+            transition: all 0.3s;
+            border-bottom: 3px solid transparent;
+        }
+
+        .tab-btn.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
+        .content {
+            padding: 20px;
+            min-height: 400px;
+            position: relative;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .input-group input {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        button {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .button-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .button-primary:hover {
+            background: #5568d3;
+        }
+
+        .button-secondary {
+            background: #f0f4ff;
+            color: #667eea;
+            border: 1px solid #667eea;
+        }
+
+        .button-secondary:hover {
+            background: #e8ecff;
+        }
+
+        .button-success {
+            background: #4caf50;
+            color: white;
+        }
+
+        .button-success:hover {
+            background: #45a049;
+        }
+
+        .button-danger {
+            background: #f44336;
+            color: white;
+        }
+
+        .button-danger:hover {
+            background: #da190b;
+        }
+
+        .qr-container {
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+
+        #qrcode {
+            display: inline-block;
+            margin: 15px 0;
+        }
+
+        .instructions {
+            background: #f0f4ff;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            font-size: 13px;
+            line-height: 1.6;
+            color: #333;
+        }
+
+        .camera-container {
+            display: none;
+            position: relative;
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            margin-top: 15px;
+            margin-bottom: 15px;
+        }
+
+        .camera-container.active {
+            display: block;
+        }
+
+        .camera-container video {
+            width: 100%;
+            height: auto;
+            display: block;
+            transform: scaleX(-1);
+        }
+
+        .camera-controls {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            z-index: 10;
+        }
+
+        .close-camera {
+            background: rgba(0, 0, 0, 0.7) !important;
+            color: white !important;
+            padding: 8px 12px !important;
+            border-radius: 6px !important;
+            font-size: 12px !important;
+        }
+
+        .close-camera:hover {
+            background: rgba(0, 0, 0, 0.9) !important;
+        }
+
+        .job-item {
+            background: #f9f9f9;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            border-left: 4px solid #667eea;
+        }
+
+        .job-item strong {
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .job-item-meta {
+            font-size: 12px;
+            color: #999;
+            margin-bottom: 10px;
+        }
+
+        .job-amount {
+            font-size: 18px;
+            font-weight: bold;
+            color: #4caf50;
+            margin-bottom: 10px;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            max-width: 400px;
+            width: 90%;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .modal-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .modal-text {
+            margin-bottom: 20px;
+            color: #666;
+            font-size: 14px;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .modal-buttons button {
+            flex: 1;
+        }
+
+        .alert {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            border-radius: 8px;
+            color: white;
+            font-size: 14px;
+            z-index: 2000;
+            animation: slideIn 0.3s ease-out;
+            max-width: 300px;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .alert-success {
+            background: #4caf50;
+        }
+
+        .alert-error {
+            background: #f44336;
+        }
+
+        .alert-info {
+            background: #2196F3;
+        }
+
+        .history-empty {
+            text-align: center;
+            padding: 40px 20px;
+            color: #999;
+        }
+
+        .history-item {
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+            font-size: 13px;
+        }
+
+        .history-item:last-child {
+            border-bottom: none;
+        }
+
+        .history-in {
+            color: #4caf50;
+        }
+
+        .history-out {
+            color: #f44336;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .login-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .login-tab-btn {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #ddd;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .login-tab-btn.active {
+            border-color: #667eea;
+            background: #667eea;
+            color: white;
+        }
+
+        .login-tab-content {
+            display: none;
+        }
+
+        .login-tab-content.active {
+            display: block;
+        }
+
+        .user-select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            margin-bottom: 15px;
+        }
+
+        .user-select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .input-group.full {
+            flex-direction: column;
+        }
+
+        .input-group.full input,
+        .input-group.full button {
+            width: 100%;
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                border-radius: 0;
+            }
+
+            body {
+                padding: 0;
+            }
+
+            .alert {
+                right: 10px;
+                left: 10px;
+                max-width: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <button class="bank-button" id="bankAdminBtn" onclick="openBankAdmin()">🏦 Banco</button>
+            <button class="bank-button" id="logoutAdminBtn" onclick="logoutAdmin()" style="display: none; background: rgba(255, 100, 100, 0.3); border-color: #ff6464;">Salir Admin</button>
+            <h1>💰 Banco DRC</h1>
+            <div class="saldo">Tu saldo: <strong id="userBalance">$0.00</strong></div>
+            <div style="margin-top: 5px; font-size: 12px;" id="userName"></div>
+        </div>
+
+        <!-- Modal de Login Inicial -->
+        <div id="loginModal" class="modal active">
+            <div class="modal-content">
+                <div class="modal-title">¿Quién eres?</div>
+                
+                <div class="login-tabs">
+                    <button class="login-tab-btn active" id="selectTabBtn" onclick="switchLoginTab('select')">Seleccionar</button>
+                    <button class="login-tab-btn" id="createTabBtn" onclick="switchLoginTab('create')">Crear</button>
+                </div>
+
+                <!-- Tab: Seleccionar -->
+                <div id="selectUserTab" class="login-tab-content active">
+                    <select class="user-select" id="initialUserSelect">
+                        <option value="">-- Selecciona un usuario --</option>
+                    </select>
+                    <button class="button-primary" style="width: 100%;" onclick="confirmInitialUser()">Ingresar</button>
+                </div>
+
+                <!-- Tab: Crear -->
+                <div id="createUserTab" class="login-tab-content">
+                    <div class="input-group full">
+                        <input type="text" id="newUserName" placeholder="Tu nombre" style="width: 100%;">
+                        <input type="password" id="newUserPassword" placeholder="Contraseña (opcional)" style="width: 100%; margin-top: 10px;">
+                        <button class="button-success" style="width: 100%; margin-top: 10px;" onclick="createNewUserAtLogin()">Crear Usuario</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal para administrador banco -->
+        <div id="bankModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-title">🏦 Administrador Banco DRC</div>
+                <div class="input-group full">
+                    <input type="password" id="bankPassword" placeholder="Contraseña" style="width: 100%;">
+                    <button class="button-primary" style="width: 100%; margin-top: 10px;" onclick="loginBankAdmin()">Acceder</button>
+                    <button class="button-secondary" style="width: 100%; margin-top: 10px;" onclick="closeBankAdmin()">Cancelar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Contenido Principal -->
+        <div class="content">
+            <!-- Tabs -->
+            <div class="tabs">
+                <button class="tab-btn active" onclick="switchTab('jobs-tab')">Trabajos</button>
+                <button class="tab-btn" onclick="switchTab('transfer-tab')">Transferencias</button>
+                <button class="tab-btn" onclick="switchTab('history-tab')">Historial</button>
+            </div>
+
+            <!-- Tab: Trabajos -->
+            <div id="jobs-tab" class="tab-content active">
+                <div class="instructions">
+                    <strong>Crear trabajo:</strong><br>
+                    1. Llena el formulario<br>
+                    2. Haz clic en "Crear"<br>
+                    3. Comparte el QR con otros<br>
+                    <br>
+                    <strong>Aceptar trabajo:</strong><br>
+                    1. Haz clic en "📷 Escanear Trabajo"<br>
+                    2. Escanea el código QR<br>
+                    3. Completa el trabajo y recibe el pago
+                </div>
+
+                <div class="input-group" style="flex-direction: column; gap: 8px;">
+                    <input type="text" id="jobTitle" placeholder="Nombre del trabajo" style="width: 100%;">
+                    <input type="text" id="jobDesc" placeholder="Descripción" style="width: 100%;">
+                    <input type="number" id="jobAmount" placeholder="Monto" min="0" step="0.01" style="width: 100%;">
+                    <button class="button-primary" style="width: 100%;" onclick="createJob()">Crear Trabajo</button>
+                </div>
+
+                <div style="margin-top: 20px;">
+                    <strong>Mis Trabajos (por hacer):</strong>
+                    <div id="myJobsContainer" style="margin-top: 10px;"></div>
+                </div>
+
+                <div style="margin-top: 20px;">
+                    <strong>Trabajos Aceptados (en progreso):</strong>
+                    <div id="acceptedJobsContainer" style="margin-top: 10px;"></div>
+                </div>
+
+                <button class="button-secondary" onclick="startJobScanning()" style="margin-top: 20px; width: 100%;">📷 Escanear Trabajo</button>
+                <div id="jobCameraContainer" class="camera-container">
+                    <video id="jobCamera" autoplay playsinline></video>
+                    <div class="camera-controls">
+                        <button class="close-camera" onclick="stopJobScanning()">✕ Cerrar</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab: Transferencias -->
+            <div id="transfer-tab" class="tab-content">
+                <div class="instructions">
+                    <strong>Enviar dinero:</strong><br>
+                    1. Ingresa el monto<br>
+                    2. Haz clic en "Generar QR"<br>
+                    3. Comparte el código con otra persona<br>
+                    <br>
+                    <strong>Recibir dinero:</strong><br>
+                    1. Haz clic en "📷 Escanear Transferencia"<br>
+                    2. Escanea el código QR<br>
+                    3. Confirma y recibe el dinero
+                </div>
+                <div class="input-group">
+                    <input type="number" id="transferAmount" placeholder="Monto a transferir" min="0" step="0.01" oninput="updateTransferPreview()">
+                    <button class="button-primary" onclick="generateQR()">Generar QR</button>
+                </div>
+                <div id="transferPreview" style="background: #f0f4ff; padding: 12px; border-radius: 6px; text-align: center; margin-bottom: 15px; display: none;">
+                    <div style="font-size: 12px; color: #999; margin-bottom: 5px;">Monto a transferir</div>
+                    <div id="previewAmount" style="font-size: 24px; font-weight: bold; color: #667eea;">$0.00</div>
+                </div>
+                <div id="qrContainer" class="qr-container">
+                    <div style="margin-bottom: 15px;">
+                        <strong>Tu código QR</strong>
+                    </div>
+                    <div id="qrcode"></div>
+                    <button class="button-secondary" onclick="downloadQR()" style="margin-top: 10px; margin-bottom: 0;">Descargar</button>
+                </div>
+
+                <button class="button-secondary" onclick="startTransferScanning()" style="margin-top: 15px; width: 100%; margin-bottom: 0;">📷 Escanear Transferencia</button>
+                <div id="transferCameraContainer" class="camera-container">
+                    <video id="transferCamera" autoplay playsinline></video>
+                    <div class="camera-controls">
+                        <button class="close-camera" onclick="stopTransferScanning()">✕ Cerrar</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab: Historial -->
+            <div id="history-tab" class="tab-content">
+                <div id="historyContainer" class="history-empty">Sin transacciones</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para confirmación de transferencia -->
+    <div id="confirmModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-title">Confirmar Transferencia</div>
+            <div class="modal-text">
+                <div style="font-size: 16px; margin: 15px 0;">
+                    <strong id="modalAmount">$0.00</strong>
+                </div>
+                <div style="font-size: 12px; color: #999; margin-bottom: 15px;">
+                    De: <span id="modalFromUser">-</span><br>
+                    Para: <span id="modalToUser">Tu cuenta</span>
+                </div>
+            </div>
+            <div class="modal-buttons">
+                <button class="button-danger" onclick="rejectTransfer()">Rechazar</button>
+                <button class="button-success" onclick="acceptTransfer()">Aceptar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para aceptar trabajo -->
+    <div id="jobConfirmModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-title">Aceptar Trabajo</div>
+            <div class="modal-text">
+                <div><strong id="jobConfirmTitle">-</strong></div>
+                <div style="font-size: 12px; color: #999; margin: 10px 0;" id="jobConfirmDesc"></div>
+                <div style="font-size: 14px; color: #999; margin-bottom: 10px;">
+                    Creador: <strong id="jobConfirmCreator">-</strong>
+                </div>
+                <div style="font-size: 18px; font-weight: bold; color: #4caf50; margin: 15px 0;">
+                    Pago: <span id="jobConfirmAmount">$0.00</span>
+                </div>
+            </div>
+            <div class="modal-buttons">
+                <button class="button-danger" onclick="rejectJob()">Rechazar</button>
+                <button class="button-success" onclick="acceptJob()">Aceptar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para notificaciones de trabajos -->
+    <div id="jobNotificationModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-title">📢 Notificación</div>
+            <div class="modal-text">
+                <div id="notificationMessage"></div>
+            </div>
+            <div class="modal-buttons">
+                <button class="button-primary" onclick="closeNotification()" style="flex: 1;">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==================== VARIABLES GLOBALES ====================
+        let currentUser = null;
+        let pendingJob = null;
+        let pendingTransfer = null;
+        let jobScanningActive = false;
+        let jobVideoStream = null;
+        let transferScanningActive = false;
+        let transferVideoStream = null;
+
+        // ==================== INICIALIZACIÓN ====================
+        window.addEventListener('load', () => {
+            initializeApp();
+            // Verificar cambios cada 2 segundos
+            setInterval(syncLocalStorage, 2000);
+        });
+
+        function initializeApp() {
+            const savedUser = localStorage.getItem('currentUserId');
+            if (savedUser) {
+                const users = getAllUsers();
+                if (users[savedUser]) {
+                    currentUser = { ...users[savedUser], userId: savedUser };
+                    document.getElementById('loginModal').classList.add('hidden');
+                    updateUserDisplay();
+                    loadHistory();
+                    loadMyJobs();
+                    loadAcceptedJobs();
+                } else {
+                    initializePreConfiguredUsers();
+                    refreshUserList();
+                }
+            } else {
+                initializePreConfiguredUsers();
+                refreshUserList();
+            }
+        }
+
+        // Sincronizar datos entre dispositivos (cada 2 segundos)
+        function syncLocalStorage() {
+            if (!currentUser) return;
+            
+            // Recargar datos del usuario actual desde localStorage
+            const users = getAllUsers();
+            if (users[currentUser.userId]) {
+                const updatedUser = users[currentUser.userId];
+                // Si el saldo cambió, actualizar
+                if (updatedUser.balance !== currentUser.balance) {
+                    currentUser.balance = updatedUser.balance;
+                    updateUserDisplay();
+                }
+            }
+
+            // Verificar si soy creador de trabajos y alguien los aceptó
+            checkForNewAcceptedJobs();
+
+            // Recargar historial y trabajos
+            loadHistory();
+            loadMyJobs();
+            loadAcceptedJobs();
+        }
+
+        function checkForNewAcceptedJobs() {
+            if (!currentUser) return;
+
+            const myJobs = getUserJobs(currentUser.userId);
+            
+            myJobs.forEach(job => {
+                // Buscar a quién aceptó este trabajo
+                const allUsers = getAllUsers();
+                
+                for (const [userId, user] of Object.entries(allUsers)) {
+                    if (user.isBank) continue;
+                    
+                    const acceptedJobs = getAcceptedJobs(userId);
+                    const hasAccepted = acceptedJobs.find(j => j.jobId === job.jobId);
+                    
+                    if (hasAccepted && !job.acceptedByNotified) {
+                        // Marcar como notificado
+                        job.acceptedByNotified = true;
+                        saveUserJobs(currentUser.userId, myJobs);
+                        
+                        // Mostrar notificación
+                        showNotification(`✓ ${user.name} aceptó tu trabajo "${job.title}"`);
+                    }
+                }
+            });
+        }
+
+        // ==================== GESTIÓN DE USUARIOS ====================
+        function getAllUsers() {
+            const stored = localStorage.getItem('users');
+            return stored ? JSON.parse(stored) : {};
+        }
+
+        function saveUsers(users) {
+            localStorage.setItem('users', JSON.stringify(users));
+        }
+
+        function initializePreConfiguredUsers() {
+            const users = getAllUsers();
+            
+            // Solo inicializar si no hay usuarios
+            if (Object.keys(users).length > 0) return;
+
+            const preConfigured = {
+                'edrian': { name: 'Edrian', balance: 100, password: '', isBank: false, createdAt: Date.now() },
+                'lukas': { name: 'Lukas', balance: 100, password: '', isBank: false, createdAt: Date.now() },
+                'makarena': { name: 'Makarena', balance: 100, password: '', isBank: false, createdAt: Date.now() },
+                'viviana': { name: 'Viviana', balance: 100, password: '', isBank: false, createdAt: Date.now() },
+                'leon': { name: 'Leon', balance: 100, password: '', isBank: false, createdAt: Date.now() },
+                'banco': { name: 'BANCO DRC', balance: 10000, password: 'edri4n$51', isBank: true, createdAt: Date.now() }
+            };
+
+            saveUsers(preConfigured);
+        }
+
+        function refreshUserList() {
+            const users = getAllUsers();
+            const select = document.getElementById('initialUserSelect');
+            select.innerHTML = '<option value="">-- Selecciona un usuario --</option>';
+
+            for (const [id, user] of Object.entries(users)) {
+                if (user.isBank) continue;
+                const option = document.createElement('option');
+                option.value = id;
+                option.textContent = user.name;
+                select.appendChild(option);
+            }
+        }
+
+        function setCurrentUser(userId) {
+            localStorage.setItem('currentUserId', userId);
+        }
+
+        function confirmInitialUser() {
+            const userId = document.getElementById('initialUserSelect').value;
+            if (!userId) {
+                showAlert('Selecciona un usuario', 'error');
+                return;
+            }
+
+            const users = getAllUsers();
+            currentUser = { ...users[userId], userId: userId };
+            setCurrentUser(userId);
+
+            document.getElementById('loginModal').classList.add('hidden');
+            updateUserDisplay();
+            loadHistory();
+            loadMyJobs();
+            loadAcceptedJobs();
+        }
+
+        function switchLoginTab(tab) {
+            document.querySelectorAll('.login-tab-content').forEach(el => {
+                el.classList.remove('active');
+            });
+            document.querySelectorAll('.login-tab-btn').forEach(el => {
+                el.classList.remove('active');
+            });
+
+            document.getElementById(tab + 'UserTab').classList.add('active');
+            document.getElementById(tab + 'TabBtn').classList.add('active');
+        }
+
+        function createNewUserAtLogin() {
+            const name = document.getElementById('newUserName').value.trim();
+            if (!name) {
+                showAlert('Ingresa un nombre', 'error');
+                return;
+            }
+
+            const users = getAllUsers();
+            const userId = name.toLowerCase().replace(/\s+/g, '_');
+
+            if (users[userId]) {
+                showAlert('Este usuario ya existe', 'error');
+                return;
+            }
+
+            users[userId] = {
+                name: name,
+                balance: 100,
+                password: document.getElementById('newUserPassword').value || '',
+                isBank: false,
+                createdAt: Date.now()
+            };
+
+            saveUsers(users);
+            currentUser = { ...users[userId], userId: userId };
+            setCurrentUser(userId);
+
+            document.getElementById('loginModal').classList.add('hidden');
+            updateUserDisplay();
+            loadHistory();
+            loadMyJobs();
+            loadAcceptedJobs();
+            
+            showAlert(`Bienvenido ${name}!`, 'success');
+        }
+
+        // ==================== UI ACTUALIZACIÓN ====================
+        function updateUserDisplay() {
+            if (!currentUser) return;
+            document.getElementById('userBalance').textContent = `$${currentUser.balance.toFixed(2)}`;
+            document.getElementById('userName').textContent = currentUser.name;
+
+            // Mostrar/ocultar botón de admin según si es admin
+            if (currentUser.isBank) {
+                document.getElementById('bankAdminBtn').style.display = 'none';
+                document.getElementById('logoutAdminBtn').style.display = 'block';
+            } else {
+                document.getElementById('bankAdminBtn').style.display = 'block';
+                document.getElementById('logoutAdminBtn').style.display = 'none';
+            }
+        }
+
+        function switchTab(tabId) {
+            // Detener escaneo si está activo
+            if (jobScanningActive) stopJobScanning();
+            if (transferScanningActive) stopTransferScanning();
+
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+
+            document.getElementById(tabId).classList.add('active');
+            event.target.classList.add('active');
+
+            // Recargar datos según la pestaña
+            if (tabId === 'jobs-tab') {
+                loadMyJobs();
+                loadAcceptedJobs();
+            } else if (tabId === 'history-tab') {
+                loadHistory();
+            }
+        }
+
+        function showAlert(message, type = 'info') {
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type}`;
+            alert.textContent = message;
+            document.body.appendChild(alert);
+
+            setTimeout(() => {
+                alert.style.animation = 'slideIn 0.3s ease-out reverse';
+                setTimeout(() => alert.remove(), 300);
+            }, 3000);
+        }
+
+        function showNotification(message) {
+            document.getElementById('notificationMessage').textContent = message;
+            document.getElementById('jobNotificationModal').classList.add('active');
+        }
+
+        function closeNotification() {
+            document.getElementById('jobNotificationModal').classList.remove('active');
+        }
+
+        // ==================== GESTIÓN DE TRABAJOS ====================
+        function createJob() {
+            if (!currentUser) return;
+
+            const title = document.getElementById('jobTitle').value.trim();
+            const desc = document.getElementById('jobDesc').value.trim();
+            const amount = parseFloat(document.getElementById('jobAmount').value);
+
+            if (!title || !desc || !amount || amount <= 0) {
+                showAlert('Completa todos los campos correctamente', 'error');
+                return;
+            }
+
+            if (currentUser.balance < amount) {
+                showAlert('No tienes saldo suficiente', 'error');
+                return;
+            }
+
+            const jobId = 'job_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            const jobData = {
+                type: 'drc_job',
+                jobId: jobId,
+                creator: currentUser.userId,
+                creatorName: currentUser.name,
+                title: title,
+                description: desc,
+                amount: amount,
+                createdAt: Date.now(),
+                status: 'available'
+            };
+
+            const myJobs = getUserJobs(currentUser.userId);
+            myJobs.push(jobData);
+            saveUserJobs(currentUser.userId, myJobs);
+
+            // Generar y mostrar QR
+            generateJobQR(jobData);
+
+            document.getElementById('jobTitle').value = '';
+            document.getElementById('jobDesc').value = '';
+            document.getElementById('jobAmount').value = '';
+
+            showAlert('Trabajo creado! Comparte el QR', 'success');
+            loadMyJobs();
+        }
+
+        function generateJobQR(jobData) {
+            const qrContainer = document.createElement('div');
+            qrContainer.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 30px; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.3); z-index: 2000;';
+            
+            const title = document.createElement('div');
+            title.textContent = 'Tu QR de Trabajo';
+            title.style.cssText = 'font-weight: bold; margin-bottom: 15px; text-align: center;';
+            qrContainer.appendChild(title);
+
+            const qrDiv = document.createElement('div');
+            qrContainer.appendChild(qrDiv);
+
+            const download = document.createElement('button');
+            download.textContent = 'Descargar QR';
+            download.className = 'button-primary';
+            download.style.cssText = 'margin-top: 15px; width: 100%;';
+            download.onclick = () => {
+                downloadJobQR(jobData, qrDiv);
+            };
+            qrContainer.appendChild(download);
+
+            const close = document.createElement('button');
+            close.textContent = 'Cerrar';
+            close.className = 'button-secondary';
+            close.style.cssText = 'margin-top: 10px; width: 100%;';
+            close.onclick = () => qrContainer.remove();
+            qrContainer.appendChild(close);
+
+            new QRCode(qrDiv, {
+                text: JSON.stringify(jobData),
+                width: 250,
+                height: 250
+            });
+
+            document.body.appendChild(qrContainer);
+        }
+
+        function downloadJobQR(jobData, qrElement) {
+            const canvas = qrElement.querySelector('canvas');
+            if (canvas) {
+                const link = document.createElement('a');
+                link.href = canvas.toDataURL();
+                link.download = `trabajo_${jobData.jobId}.png`;
+                link.click();
+            }
+        }
+
+        function loadMyJobs() {
+            if (!currentUser) return;
+
+            const jobs = getUserJobs(currentUser.userId);
+            const container = document.getElementById('myJobsContainer');
+            container.innerHTML = '';
+
+            if (jobs.length === 0) {
+                container.innerHTML = '<div style="color: #999; font-size: 13px;">No has creado trabajos</div>';
+                return;
+            }
+
+            jobs.forEach(job => {
+                const div = document.createElement('div');
+                div.className = 'job-item';
+                div.innerHTML = `
+                    <strong>${job.title}</strong>
+                    <div class="job-item-meta">${job.description}</div>
+                    <div class="job-amount">$${job.amount.toFixed(2)}</div>
+                    <button class="button-secondary" style="width: 100%; font-size: 12px;" onclick="showJobQR('${job.jobId}')">Mostrar QR</button>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function showJobQR(jobId) {
+            const jobs = getUserJobs(currentUser.userId);
+            const job = jobs.find(j => j.jobId === jobId);
+            if (job) {
+                generateJobQR(job);
+            }
+        }
+
+        function loadAcceptedJobs() {
+            if (!currentUser) return;
+
+            const jobs = getAcceptedJobs(currentUser.userId);
+            const container = document.getElementById('acceptedJobsContainer');
+            container.innerHTML = '';
+
+            if (jobs.length === 0) {
+                container.innerHTML = '<div style="color: #999; font-size: 13px;">No tienes trabajos en progreso</div>';
+                return;
+            }
+
+            jobs.forEach(job => {
+                const div = document.createElement('div');
+                div.className = 'job-item';
+                div.style.borderLeftColor = '#ffa500';
+                div.innerHTML = `
+                    <strong>${job.title}</strong>
+                    <div class="job-item-meta">${job.description}</div>
+                    <div style="font-size: 12px; color: #999;">Por: ${job.creatorName}</div>
+                    <div class="job-amount">$${job.amount.toFixed(2)}</div>
+                    <button class="button-success" style="width: 100%; font-size: 12px;" onclick="completeJob('${job.jobId}')">✓ Completar</button>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function startJobScanning() {
+            if (jobScanningActive) return;
+
+            const video = document.getElementById('jobCamera');
+            if (!video) {
+                showAlert('Elemento de video no encontrado', 'error');
+                return;
+            }
+
+            jobScanningActive = true;
+            showAlert('Abriendo cámara...', 'info');
+
+            navigator.mediaDevices.getUserMedia({
+                video: { facingMode: 'environment' }
+            }).then(stream => {
+                jobVideoStream = stream;
+                video.srcObject = stream;
+                video.play();
+                document.getElementById('jobCameraContainer').classList.add('active');
+                showAlert('Cámara abierta - Escanea un QR', 'success');
+
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                let framesScanned = 0;
+
+                const scanFrame = () => {
+                    if (!jobScanningActive) return;
+
+                    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                        canvas.width = video.videoWidth;
+                        canvas.height = video.videoHeight;
+                        context.drawImage(video, 0, 0);
+
+                        const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+                        const code = jsQR(imageData.data, imageData.width, imageData.height);
+
+                        framesScanned++;
+
+                        if (code) {
+                            console.log('QR detectado:', code.data);
+                            handleJobQRScan(code.data);
+                            stopJobScanning();
+                            return;
+                        }
+
+                        if (framesScanned % 30 === 0) {
+                            console.log('Escaneando... frames:', framesScanned);
+                        }
+                    }
+
+                    requestAnimationFrame(scanFrame);
+                };
+
+                scanFrame();
+            }).catch(err => {
+                console.error('Error de cámara:', err);
+                showAlert('No se pudo acceder a la cámara: ' + err.message, 'error');
+                jobScanningActive = false;
+            });
+        }
+
+        function stopJobScanning() {
+            jobScanningActive = false;
+            document.getElementById('jobCameraContainer').classList.remove('active');
+
+            if (jobVideoStream) {
+                jobVideoStream.getTracks().forEach(track => track.stop());
+                jobVideoStream = null;
+            }
+        }
+
+        function handleJobQRScan(qrData) {
+            try {
+                const data = JSON.parse(qrData);
+
+                if (data.type !== 'drc_job' || !data.jobId) {
+                    showAlert('QR inválido o no es un trabajo', 'error');
+                    return;
+                }
+
+                pendingJob = data;
+                showJobConfirmation(data);
+
+            } catch (err) {
+                showAlert('Error al decodificar QR: ' + err.message, 'error');
+            }
+        }
+
+        function showJobConfirmation(jobData) {
+            document.getElementById('jobConfirmTitle').textContent = jobData.title;
+            document.getElementById('jobConfirmDesc').textContent = jobData.description;
+            document.getElementById('jobConfirmAmount').textContent = `$${jobData.amount.toFixed(2)}`;
+            document.getElementById('jobConfirmCreator').textContent = jobData.creatorName;
+            document.getElementById('jobConfirmModal').classList.add('active');
+        }
+
+        function acceptJob() {
+            if (!pendingJob || !currentUser) return;
+
+            const acceptedJobs = getAcceptedJobs(currentUser.userId);
+
+            if (acceptedJobs.find(j => j.jobId === pendingJob.jobId)) {
+                showAlert('Ya aceptaste este trabajo', 'error');
+                document.getElementById('jobConfirmModal').classList.remove('active');
+                return;
+            }
+
+            acceptedJobs.push(pendingJob);
+            saveAcceptedJobs(currentUser.userId, acceptedJobs);
+
+            document.getElementById('jobConfirmModal').classList.remove('active');
+            pendingJob = null;
+
+            showAlert('¡Trabajo aceptado! Complétalo para recibir el pago', 'success');
+            loadAcceptedJobs();
+        }
+
+        function rejectJob() {
+            document.getElementById('jobConfirmModal').classList.remove('active');
+            pendingJob = null;
+            showAlert('Trabajo rechazado', 'info');
+        }
+
+        function completeJob(jobId) {
+            if (!currentUser) return;
+
+            const acceptedJobs = getAcceptedJobs(currentUser.userId);
+            const job = acceptedJobs.find(j => j.jobId === jobId);
+
+            if (!job) return;
+
+            const users = getAllUsers();
+            const creator = users[job.creator];
+
+            if (!creator || creator.balance < job.amount) {
+                showAlert('El creador del trabajo no tiene saldo suficiente', 'error');
+                return;
+            }
+
+            // Realizar transferencia
+            creator.balance -= job.amount;
+            currentUser.balance += job.amount;
+
+            users[job.creator] = creator;
+            users[currentUser.userId] = currentUser;
+            saveUsers(users);
+
+            // Registrar en historial del receptor (trabajo completado)
+            const history = getUserHistory(currentUser.userId);
+            history.push({
+                type: 'in',
+                amount: job.amount,
+                fromUser: job.creator,
+                fromName: job.creatorName,
+                reason: 'Trabajo completado: ' + job.title,
+                txId: jobId,
+                timestamp: Date.now()
+            });
+            saveUserHistory(currentUser.userId, history);
+
+            // Registrar en historial del creador
+            const creatorHistory = getUserHistory(job.creator);
+            creatorHistory.push({
+                type: 'out',
+                amount: job.amount,
+                toUser: currentUser.userId,
+                toName: currentUser.name,
+                reason: 'Trabajo pagado: ' + job.title,
+                txId: jobId,
+                timestamp: Date.now()
+            });
+            saveUserHistory(job.creator, creatorHistory);
+
+            // Eliminar trabajo de aceptados
+            const updatedAccepted = acceptedJobs.filter(j => j.jobId !== jobId);
+            saveAcceptedJobs(currentUser.userId, updatedAccepted);
+
+            updateUserDisplay();
+            loadAcceptedJobs();
+            loadHistory();
+
+            showAlert(`✓ Trabajo completado! Recibiste $${job.amount.toFixed(2)}`, 'success');
+        }
+
+        // ==================== GESTIÓN DE TRANSFERENCIAS ====================
+        function updateTransferPreview() {
+            const amount = parseFloat(document.getElementById('transferAmount').value) || 0;
+            const preview = document.getElementById('transferPreview');
+            const previewAmount = document.getElementById('previewAmount');
+
+            if (amount > 0) {
+                previewAmount.textContent = `$${amount.toFixed(2)}`;
+                preview.style.display = 'block';
+            } else {
+                preview.style.display = 'none';
+            }
+        }
+
+        function generateQR() {
+            if (!currentUser) {
+                showAlert('Debes estar logueado', 'error');
+                return;
+            }
+
+            const amount = parseFloat(document.getElementById('transferAmount').value);
+            if (!amount || amount <= 0 || amount > currentUser.balance) {
+                showAlert('Ingresa un monto válido y que no exceda tu saldo', 'error');
+                return;
+            }
+
+            const transferData = {
+                type: 'drc_transfer',
+                from: currentUser.userId,
+                amount: amount,
+                id: 'txn_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+                ts: Date.now()
+            };
+
+            // Limpiar QR anterior
+            document.getElementById('qrcode').innerHTML = '';
+
+            // Generar QR
+            new QRCode(document.getElementById('qrcode'), {
+                text: JSON.stringify(transferData),
+                width: 250,
+                height: 250
+            });
+
+            showAlert('QR generado! Comparte con otra persona', 'success');
+        }
+
+        function downloadQR() {
+            const canvas = document.querySelector('#qrcode canvas');
+            if (canvas) {
+                const link = document.createElement('a');
+                link.href = canvas.toDataURL();
+                link.download = 'transferencia_qr.png';
+                link.click();
+            }
+        }
+
+        function startTransferScanning() {
+            if (transferScanningActive) return;
+
+            const video = document.getElementById('transferCamera');
+            if (!video) {
+                showAlert('Elemento de video no encontrado', 'error');
+                return;
+            }
+
+            transferScanningActive = true;
+            showAlert('Abriendo cámara...', 'info');
+
+            navigator.mediaDevices.getUserMedia({
+                video: { facingMode: 'environment' }
+            }).then(stream => {
+                transferVideoStream = stream;
+                video.srcObject = stream;
+                video.play();
+                document.getElementById('transferCameraContainer').classList.add('active');
+                showAlert('Cámara abierta - Escanea un QR', 'success');
+
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                let framesScanned = 0;
+
+                const scanFrame = () => {
+                    if (!transferScanningActive) return;
+
+                    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                        canvas.width = video.videoWidth;
+                        canvas.height = video.videoHeight;
+                        context.drawImage(video, 0, 0);
+
+                        const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+                        const code = jsQR(imageData.data, imageData.width, imageData.height);
+
+                        framesScanned++;
+
+                        if (code) {
+                            console.log('Transfer QR detectado:', code.data);
+                            handleTransferQRScan(code.data);
+                            stopTransferScanning();
+                            return;
+                        }
+
+                        if (framesScanned % 30 === 0) {
+                            console.log('Escaneando transferencia... frames:', framesScanned);
+                        }
+                    }
+
+                    requestAnimationFrame(scanFrame);
+                };
+
+                scanFrame();
+            }).catch(err => {
+                console.error('Error de cámara:', err);
+                showAlert('No se pudo acceder a la cámara: ' + err.message, 'error');
+                transferScanningActive = false;
+            });
+        }
+
+        function stopTransferScanning() {
+            transferScanningActive = false;
+            document.getElementById('transferCameraContainer').classList.remove('active');
+
+            if (transferVideoStream) {
+                transferVideoStream.getTracks().forEach(track => track.stop());
+                transferVideoStream = null;
+            }
+        }
+
+        function handleTransferQRScan(qrData) {
+            try {
+                const data = JSON.parse(qrData);
+
+                if (data.type !== 'drc_transfer' || !data.from || typeof data.amount !== 'number') {
+                    showAlert('QR inválido o no es una transferencia', 'error');
+                    return;
+                }
+
+                if (data.amount <= 0) {
+                    showAlert('Monto inválido en el QR', 'error');
+                    return;
+                }
+
+                const users = getAllUsers();
+                if (!users[data.from]) {
+                    showAlert('Usuario emisor no encontrado', 'error');
+                    return;
+                }
+
+                pendingTransfer = data;
+                showTransferConfirmation(data, users[data.from].name);
+
+            } catch (err) {
+                showAlert('Error al decodificar QR: ' + err.message, 'error');
+            }
+        }
+
+        function showTransferConfirmation(transferData, senderName) {
+            document.getElementById('modalAmount').textContent = `$${transferData.amount.toFixed(2)}`;
+            document.getElementById('modalFromUser').textContent = senderName;
+            document.getElementById('modalToUser').textContent = currentUser.name;
+            document.getElementById('confirmModal').classList.add('active');
+        }
+
+        function acceptTransfer() {
+            if (!pendingTransfer || !currentUser) return;
+
+            const users = getAllUsers();
+            const sender = users[pendingTransfer.from];
+
+            if (!sender) {
+                showAlert('Usuario emisor no encontrado', 'error');
+                document.getElementById('confirmModal').classList.remove('active');
+                return;
+            }
+
+            if (sender.balance < pendingTransfer.amount) {
+                showAlert('El emisor no tiene saldo suficiente', 'error');
+                document.getElementById('confirmModal').classList.remove('active');
+                return;
+            }
+
+            // Deducir del emisor
+            sender.balance -= pendingTransfer.amount;
+            // Agregar al receptor
+            currentUser.balance += pendingTransfer.amount;
+
+            // Guardar ambos usuarios
+            users[pendingTransfer.from] = sender;
+            users[currentUser.userId] = currentUser;
+            saveUsers(users);
+
+            // Registrar en historial del receptor (entrada)
+            const history = getUserHistory(currentUser.userId);
+            history.push({
+                type: 'in',
+                amount: pendingTransfer.amount,
+                fromUser: pendingTransfer.from,
+                fromName: sender.name,
+                txId: pendingTransfer.id,
+                timestamp: Date.now()
+            });
+            saveUserHistory(currentUser.userId, history);
+
+            // Registrar en historial del emisor (salida)
+            const senderHistory = getUserHistory(pendingTransfer.from);
+            senderHistory.push({
+                type: 'out',
+                amount: pendingTransfer.amount,
+                toUser: currentUser.userId,
+                toName: currentUser.name,
+                txId: pendingTransfer.id,
+                timestamp: Date.now()
+            });
+            saveUserHistory(pendingTransfer.from, senderHistory);
+
+            updateUserDisplay();
+            loadHistory();
+
+            document.getElementById('confirmModal').classList.remove('active');
+            const amount = pendingTransfer.amount;
+            const senderName = sender.name;
+            pendingTransfer = null;
+
+            showAlert(`✓ Transferencia de $${amount.toFixed(2)} recibida de ${senderName}`, 'success');
+        }
+
+        function rejectTransfer() {
+            document.getElementById('confirmModal').classList.remove('active');
+            pendingTransfer = null;
+            showAlert('Transferencia rechazada', 'info');
+        }
+
+        // ==================== HISTORIAL ====================
+        function loadHistory() {
+            if (!currentUser) return;
+
+            const history = getUserHistory(currentUser.userId);
+            const container = document.getElementById('historyContainer');
+
+            if (history.length === 0) {
+                container.innerHTML = '<div class="history-empty">Sin transacciones</div>';
+                return;
+            }
+
+            container.innerHTML = '';
+            const sortedHistory = [...history].reverse();
+
+            sortedHistory.forEach(item => {
+                const date = new Date(item.timestamp).toLocaleDateString('es-ES', { 
+                    year: 'numeric', 
+                    month: 'short', 
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+
+                const div = document.createElement('div');
+                div.className = 'history-item';
+                
+                let text = '';
+                if (item.type === 'in') {
+                    text = `<span class="history-in">+$${item.amount.toFixed(2)}</span> de ${item.fromName}`;
+                } else {
+                    text = `<span class="history-out">-$${item.amount.toFixed(2)}</span> a ${item.toName}`;
+                }
+
+                div.innerHTML = `<div>${text}</div><div style="font-size: 11px; color: #999;">${date}</div>`;
+                container.appendChild(div);
+            });
+        }
+
+        // ==================== BANCO ADMIN ====================
+        function openBankAdmin() {
+            document.getElementById('bankModal').classList.add('active');
+        }
+
+        function closeBankAdmin() {
+            document.getElementById('bankModal').classList.remove('active');
+            document.getElementById('bankPassword').value = '';
+        }
+
+        function loginBankAdmin() {
+            const password = document.getElementById('bankPassword').value;
+
+            if (!password) {
+                showAlert('Ingresa la contraseña', 'error');
+                return;
+            }
+
+            if (password !== 'edri4n$51') {
+                showAlert('Contraseña incorrecta', 'error');
+                return;
+            }
+
+            const users = getAllUsers();
+            currentUser = { ...users['banco'], userId: 'banco' };
+            setCurrentUser('banco');
+
+            closeBankAdmin();
+            updateUserDisplay();
+            loadHistory();
+            loadMyJobs();
+
+            // Mostrar botón de salir y ocultar el de acceso
+            document.getElementById('bankAdminBtn').style.display = 'none';
+            document.getElementById('logoutAdminBtn').style.display = 'block';
+
+            showAlert('Bienvenido administrador', 'success');
+        }
+
+        function logoutAdmin() {
+            const users = getAllUsers();
+            const firstUserId = Object.keys(users).find(id => !users[id].isBank);
+            
+            if (firstUserId) {
+                currentUser = { ...users[firstUserId], userId: firstUserId };
+                setCurrentUser(firstUserId);
+            } else {
+                localStorage.removeItem('currentUserId');
+                currentUser = null;
+            }
+
+            updateUserDisplay();
+            loadHistory();
+            loadMyJobs();
+            loadAcceptedJobs();
+
+            // Mostrar botón de acceso y ocultar el de salir
+            document.getElementById('bankAdminBtn').style.display = 'block';
+            document.getElementById('logoutAdminBtn').style.display = 'none';
+
+            showAlert('Saliste del modo admin', 'info');
+        }
+
+        // ==================== ALMACENAMIENTO LOCAL ====================
+        function getUserHistory(userId) {
+            const key = `history_${userId}`;
+            const stored = localStorage.getItem(key);
+            return stored ? JSON.parse(stored) : [];
+        }
+
+        function saveUserHistory(userId, history) {
+            const key = `history_${userId}`;
+            localStorage.setItem(key, JSON.stringify(history));
+        }
+
+        function getUserJobs(userId) {
+            const key = `jobs_${userId}`;
+            const stored = localStorage.getItem(key);
+            return stored ? JSON.parse(stored) : [];
+        }
+
+        function saveUserJobs(userId, jobs) {
+            const key = `jobs_${userId}`;
+            localStorage.setItem(key, JSON.stringify(jobs));
+        }
+
+        function getAcceptedJobs(userId) {
+            const key = `accepted_jobs_${userId}`;
+            const stored = localStorage.getItem(key);
+            return stored ? JSON.parse(stored) : [];
+        }
+
+        function saveAcceptedJobs(userId, jobs) {
+            const key = `accepted_jobs_${userId}`;
+            localStorage.setItem(key, JSON.stringify(jobs));
+        }
+    </script>
+</body>
+</html>
