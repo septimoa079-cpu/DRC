@@ -589,6 +589,20 @@
         </div>
     </div>
 
+    <!-- Modal para forzar aceptación cuando no hay registro local -->
+    <div id="forceAcceptModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-title">Forzar aceptación</div>
+            <div class="modal-text">
+                <div id="forceAcceptText">No se encontró registro de esta transferencia en este dispositivo. Puedes forzar la aceptación (creará un registro local). Esto puede desincronizar saldos entre dispositivos.</div>
+            </div>
+            <div class="modal-buttons">
+                <button class="button-secondary" onclick="closeForceAccept()">Cancelar</button>
+                <button class="button-primary" onclick="forceAcceptTransfer()">Forzar aceptar</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal para aceptar trabajo -->
     <div id="jobConfirmModal" class="modal">
         <div class="modal-content">
@@ -1490,8 +1504,9 @@
             }
 
             if (transferIndex === -1) {
-                showAlert('QR inválido o expirado (no hay registro en este dispositivo)', 'error');
+                // En lugar de fallar inmediatamente, ofrecer forzar aceptación
                 document.getElementById('confirmModal').classList.remove('active');
+                showForceAccept(pendingTransfer);
                 return;
             }
 
@@ -1552,6 +1567,76 @@
             document.getElementById('confirmModal').classList.remove('active');
             pendingTransfer = null;
             showAlert('Transferencia rechazada', 'info');
+        }
+
+        // Forzar aceptación cuando no se encuentra el registro en localStorage
+        function showForceAccept(transferData) {
+            pendingTransfer = transferData;
+            document.getElementById('forceAcceptText').textContent = `No se encontró registro local de la transferencia de $${transferData.amount.toFixed(2)} desde ${transferData.from}. Puedes forzar la aceptación (esto creará un registro local y creditara tu cuenta).`;
+            document.getElementById('forceAcceptModal').classList.add('active');
+        }
+
+        function closeForceAccept() {
+            document.getElementById('forceAcceptModal').classList.remove('active');
+            pendingTransfer = null;
+        }
+
+        function forceAcceptTransfer() {
+            if (!pendingTransfer || !currentUser) return;
+
+            const users = getAllUsers();
+
+            // Marcar un registro local como usado para evitar reuso en este dispositivo
+            const pendingTransfers = JSON.parse(localStorage.getItem('pendingTransfers') || '[]');
+            try {
+                const txId = pendingTransfer.id || ('txn_forced_' + Date.now());
+                const amount = Number(pendingTransfer.amount) || 0;
+                const record = { ...pendingTransfer, id: txId, used: true };
+                pendingTransfers.push(record);
+                localStorage.setItem('pendingTransfers', JSON.stringify(pendingTransfers));
+
+                // Creditamos al receptor
+                currentUser.balance += amount;
+                users[currentUser.userId] = currentUser;
+                saveUsers(users);
+
+                // Registrar historial del receptor (entrada)
+                const history = getUserHistory(currentUser.userId);
+                history.push({
+                    type: 'in',
+                    amount: amount,
+                    fromUser: pendingTransfer.from,
+                    fromName: (users[pendingTransfer.from] && users[pendingTransfer.from].name) || pendingTransfer.from,
+                    txId: txId,
+                    timestamp: Date.now()
+                });
+                saveUserHistory(currentUser.userId, history);
+
+                // Si el emisor existe en este dispositivo, registrar su historial de salida también
+                if (users[pendingTransfer.from]) {
+                    const senderHistory = getUserHistory(pendingTransfer.from);
+                    senderHistory.push({
+                        type: 'out',
+                        amount: amount,
+                        toUser: currentUser.userId,
+                        toName: currentUser.name,
+                        txId: txId,
+                        timestamp: Date.now()
+                    });
+                    saveUserHistory(pendingTransfer.from, senderHistory);
+                }
+
+                document.getElementById('forceAcceptModal').classList.remove('active');
+                pendingTransfer = null;
+
+                updateUserDisplay();
+                loadHistory();
+
+                showAlert(`✓ Transferencia forzada: recibiste $${amount.toFixed(2)}`, 'success');
+            } catch (e) {
+                console.error('Error forzando aceptación:', e);
+                showAlert('Error al forzar la aceptación', 'error');
+            }
         }
 
         // ==================== HISTORIAL ====================
