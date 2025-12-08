@@ -1036,10 +1036,34 @@
         }
 
         function showJobQR(jobId) {
-            const jobs = getUserJobs(currentUser.userId);
-            const job = jobs.find(j => j.jobId === jobId);
-            if (job) {
+            if (!currentUser) return showAlert('Debes estar logueado', 'error');
+
+            // Intentar encontrar el trabajo en mis trabajos
+            let job = getUserJobs(currentUser.userId).find(j => j.jobId === jobId);
+
+            // Si no está en mis trabajos, buscar en todos los usuarios (por seguridad)
+            if (!job) {
+                const users = getAllUsers();
+                for (const [uid] of Object.entries(users)) {
+                    const jobs = getUserJobs(uid);
+                    const found = jobs.find(j => j.jobId === jobId);
+                    if (found) {
+                        job = found;
+                        break;
+                    }
+                }
+            }
+
+            if (!job) return showAlert('Trabajo no encontrado', 'error');
+
+            // Solo el creador puede mostrar el QR del trabajo
+            if (job.creator !== currentUser.userId) return showAlert('Solo el creador puede mostrar el QR', 'error');
+
+            try {
                 generateJobQR(job);
+            } catch (err) {
+                console.error('Error generando QR del trabajo:', err);
+                showAlert('No se pudo generar el QR del trabajo', 'error');
             }
         }
 
