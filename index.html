@@ -1153,16 +1153,12 @@
                     return;
                 }
 
-                // Verificar si el trabajo ya fue aceptado por alguien
-                const users = getAllUsers();
-                const creator = users[data.creator];
-
-                if (!creator) {
-                    showAlert('Usuario creador no encontrado', 'error');
-                    return;
-                }
+                // No deducir aquí. La reserva (descuento) se realizará
+                // cuando el usuario confirme aceptar el trabajo (acceptJob).
+                // Solo validar formato y estado y mostrar confirmación.
 
                 // Buscar si alguien ya aceptó este trabajo
+                const users = getAllUsers();
                 for (const [userId, user] of Object.entries(users)) {
                     if (user.isBank) continue;
                     const acceptedJobs = getAcceptedJobs(userId);
@@ -1171,16 +1167,6 @@
                         return;
                     }
                 }
-
-                // Deducir dinero del creador inmediatamente (reservar el dinero)
-                if (creator.balance < data.amount) {
-                    showAlert('El creador ya no tiene saldo suficiente', 'error');
-                    return;
-                }
-
-                creator.balance -= data.amount;
-                users[data.creator] = creator;
-                saveUsers(users);
 
                 pendingJob = data;
                 showJobConfirmation(data);
@@ -1221,8 +1207,52 @@
                 }
             }
 
+            // Antes de aceptar, reservar el dinero del creador
+            const creator = users[pendingJob.creator];
+            if (!creator) {
+                showAlert('Usuario creador no encontrado', 'error');
+                document.getElementById('jobConfirmModal').classList.remove('active');
+                pendingJob = null;
+                return;
+            }
+
+            if (creator.balance < pendingJob.amount) {
+                showAlert('El creador ya no tiene saldo suficiente', 'error');
+                document.getElementById('jobConfirmModal').classList.remove('active');
+                pendingJob = null;
+                return;
+            }
+
+            // Deducir (reservar) del creador
+            creator.balance -= pendingJob.amount;
+            users[pendingJob.creator] = creator;
+            saveUsers(users);
+
+            // Marcar el trabajo en la lista del creador como reservado/activo=false
+            const creatorJobs = getUserJobs(pendingJob.creator);
+            const idx = creatorJobs.findIndex(j => j.jobId === pendingJob.jobId);
+            if (idx !== -1) {
+                creatorJobs[idx].active = false;
+                creatorJobs[idx].reservedBy = currentUser.userId;
+                saveUserJobs(pendingJob.creator, creatorJobs);
+            }
+
+            // Agregar al trabajador en accepted
             acceptedJobs.push(pendingJob);
             saveAcceptedJobs(currentUser.userId, acceptedJobs);
+
+            // Registrar en historial del creador como reserva (salida)
+            const creatorHistory = getUserHistory(pendingJob.creator);
+            creatorHistory.push({
+                type: 'out',
+                amount: pendingJob.amount,
+                toUser: currentUser.userId,
+                toName: currentUser.name,
+                reason: 'Reserva por trabajo aceptado: ' + pendingJob.title,
+                txId: pendingJob.jobId,
+                timestamp: Date.now()
+            });
+            saveUserHistory(pendingJob.creator, creatorHistory);
 
             document.getElementById('jobConfirmModal').classList.remove('active');
             pendingJob = null;
@@ -1273,18 +1303,6 @@
             });
             saveUserHistory(currentUser.userId, history);
 
-            // Registrar en historial del creador
-            const creatorHistory = getUserHistory(job.creator);
-            creatorHistory.push({
-                type: 'out',
-                amount: job.amount,
-                toUser: currentUser.userId,
-                toName: currentUser.name,
-                reason: 'Trabajo pagado: ' + job.title,
-                txId: jobId,
-                timestamp: Date.now()
-            });
-            saveUserHistory(job.creator, creatorHistory);
 
             // Eliminar trabajo de aceptados
             const updatedAccepted = acceptedJobs.filter(j => j.jobId !== jobId);
@@ -1691,6 +1709,86 @@
         function saveAcceptedJobs(userId, jobs) {
             const key = `accepted_jobs_${userId}`;
             localStorage.setItem(key, JSON.stringify(jobs));
+        }
+
+        // ==================== UTILIDADES DE TRABAJOS (aceptado/cancelar) ====================
+        function isJobAccepted(jobId) {
+            const users = getAllUsers();
+            for (const [userId, user] of Object.entries(users)) {
+                if (user.isBank) continue;
+                const accepted = getAcceptedJobs(userId);
+                if (accepted.find(j => j.jobId === jobId)) return true;
+            }
+            return false;
+        }
+
+        function cancelCreatedJob(jobId) {
+            if (!currentUser) return;
+            const myJobs = getUserJobs(currentUser.userId);
+            const idx = myJobs.findIndex(j => j.jobId === jobId);
+            if (idx === -1) return showAlert('Trabajo no encontrado', 'error');
+
+            // Si ya fue aceptado, no permitir cancelar
+            if (isJobAccepted(jobId)) {
+                return showAlert('No se puede cancelar: alguien ya aceptó este trabajo', 'error');
+            }
+
+            myJobs.splice(idx, 1);
+            saveUserJobs(currentUser.userId, myJobs);
+            loadMyJobs();
+            showAlert('Trabajo cancelado', 'info');
+        }
+
+        function cancelAcceptedJob(jobId) {
+            if (!currentUser) return;
+            const accepted = getAcceptedJobs(currentUser.userId);
+            const idx = accepted.findIndex(j => j.jobId === jobId);
+            if (idx === -1) return showAlert('Trabajo no encontrado en tus aceptados', 'error');
+
+            const job = accepted[idx];
+
+            // Eliminar de aceptados del trabajador
+            accepted.splice(idx, 1);
+            saveAcceptedJobs(currentUser.userId, accepted);
+
+            // Devolver la reserva al creador
+            const users = getAllUsers();
+            const creator = users[job.creator];
+            if (creator) {
+                creator.balance = (creator.balance || 0) + job.amount;
+                users[job.creator] = creator;
+                saveUsers(users);
+
+                // Actualizar trabajos del creador: marcar disponible otra vez
+                const creatorJobs = getUserJobs(job.creator);
+                const cidx = creatorJobs.findIndex(j => j.jobId === job.jobId);
+                if (cidx !== -1) {
+                    creatorJobs[cidx].active = true;
+                    delete creatorJobs[cidx].reservedBy;
+                    creatorJobs[cidx].acceptedByNotified = false;
+                    saveUserJobs(job.creator, creatorJobs);
+                }
+            }
+
+            // Registro en historial del creador (restitución)
+            if (creator) {
+                const creatorHistory = getUserHistory(job.creator);
+                creatorHistory.push({
+                    type: 'in',
+                    amount: job.amount,
+                    fromUser: currentUser.userId,
+                    fromName: currentUser.name,
+                    reason: 'Cancelación de aceptación - fondos devueltos: ' + job.title,
+                    txId: job.jobId,
+                    timestamp: Date.now()
+                });
+                saveUserHistory(job.creator, creatorHistory);
+            }
+
+            loadAcceptedJobs();
+            loadMyJobs();
+            updateUserDisplay();
+            showAlert('Aceptación cancelada y fondos devueltos al creador', 'info');
         }
     </script>
 </body>
