@@ -1020,11 +1020,16 @@
             jobs.forEach(job => {
                 const div = document.createElement('div');
                 div.className = 'job-item';
+                const accepted = isJobAccepted(job.jobId);
+
                 div.innerHTML = `
                     <strong>${job.title}</strong>
                     <div class="job-item-meta">${job.description}</div>
                     <div class="job-amount">$${job.amount.toFixed(2)}</div>
-                    <button class="button-secondary" style="width: 100%; font-size: 12px;" onclick="showJobQR('${job.jobId}')">Mostrar QR</button>
+                    <div style="display:flex; gap:8px; margin-top:8px;">
+                        <button class="button-secondary" style="flex:1; font-size: 12px;" onclick="showJobQR('${job.jobId}')">Mostrar QR</button>
+                        ${accepted ? `<button class=\"button-danger\" style=\"flex:1; font-size:12px;\" disabled>Ya aceptado</button>` : `<button class=\"button-danger\" style=\"flex:1; font-size:12px;\" onclick=\"cancelCreatedJob('${job.jobId}')\">Cancelar</button>`}
+                    </div>
                 `;
                 container.appendChild(div);
             });
@@ -1059,7 +1064,10 @@
                     <div class="job-item-meta">${job.description}</div>
                     <div style="font-size: 12px; color: #999;">Por: ${job.creatorName}</div>
                     <div class="job-amount">$${job.amount.toFixed(2)}</div>
-                    <button class="button-success" style="width: 100%; font-size: 12px;" onclick="completeJob('${job.jobId}')">✓ Completar</button>
+                    <div style="display:flex; gap:8px; margin-top:8px;">
+                        <button class="button-success" style="flex:1; font-size: 12px;" onclick="completeJob('${job.jobId}')">✓ Completar</button>
+                        <button class="button-secondary" style="flex:1; font-size:12px;" onclick="cancelAcceptedJob('${job.jobId}')">Cancelar</button>
+                    </div>
                 `;
                 container.appendChild(div);
             });
