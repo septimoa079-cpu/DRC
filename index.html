@@ -1470,10 +1470,27 @@
 
             // Marcar el QR como usado
             const pendingTransfers = JSON.parse(localStorage.getItem('pendingTransfers') || '[]');
-            const transferIndex = pendingTransfers.findIndex(t => t.id === pendingTransfer.id);
-            
+            console.log('pendingTransfers (local):', pendingTransfers);
+            console.log('pendingTransfer (scanned):', pendingTransfer);
+
+            let transferIndex = pendingTransfers.findIndex(t => t.id === pendingTransfer.id);
+
+            // Fallback: si no se encuentra por id, intentar emparejar por from+amount+ts cercano (por si el storage fue modificado)
             if (transferIndex === -1) {
-                showAlert('QR inválido o expirado', 'error');
+                transferIndex = pendingTransfers.findIndex(t => {
+                    try {
+                        const sameFrom = t.from === pendingTransfer.from;
+                        const sameAmount = Number(t.amount) === Number(pendingTransfer.amount);
+                        const tsDiff = Math.abs((Number(t.ts) || 0) - (Number(pendingTransfer.ts) || 0));
+                        return sameFrom && sameAmount && tsDiff < 60000; // 60s
+                    } catch (e) {
+                        return false;
+                    }
+                });
+            }
+
+            if (transferIndex === -1) {
+                showAlert('QR inválido o expirado (no hay registro en este dispositivo)', 'error');
                 document.getElementById('confirmModal').classList.remove('active');
                 return;
             }
