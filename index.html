@@ -682,10 +682,18 @@
             // Verificar si soy creador de trabajos y alguien los aceptó
             checkForNewAcceptedJobs();
 
-            // Recargar historial y trabajos
+            // Recargar historial
             loadHistory();
-            loadMyJobs();
-            loadAcceptedJobs();
+
+            // Evitar re-renderizar la sección de impuestos/préstamos si el usuario está escribiendo
+            const taxContainer = document.getElementById('taxContainer');
+            const active = document.activeElement;
+            const userTypingInTax = taxContainer && active && taxContainer.contains(active);
+
+            if (!userTypingInTax) {
+                loadMyJobs();
+                loadAcceptedJobs();
+            }
         }
 
         function checkForNewAcceptedJobs() {
