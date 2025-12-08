@@ -502,48 +502,25 @@
         <div class="content">
             <!-- Tabs -->
             <div class="tabs">
-                <button class="tab-btn active" onclick="switchTab('jobs-tab')">Trabajos</button>
+                <button class="tab-btn active" onclick="switchTab('jobs-tab')">IMPUESTOS</button>
                 <button class="tab-btn" onclick="switchTab('transfer-tab')">Transferencias</button>
                 <button class="tab-btn" onclick="switchTab('history-tab')">Historial</button>
             </div>
 
-            <!-- Tab: Trabajos -->
+            <!-- Tab: IMPUESTOS -->
             <div id="jobs-tab" class="tab-content active">
                 <div class="instructions">
-                    <strong>Crear trabajo:</strong><br>
-                    1. Llena el formulario<br>
-                    2. Haz clic en "Crear"<br>
-                    3. Comparte el QR con otros<br>
-                    <br>
-                    <strong>Aceptar trabajo:</strong><br>
-                    1. Haz clic en "📷 Escanear Trabajo"<br>
-                    2. Escanea el código QR<br>
-                    3. Completa el trabajo y recibe el pago
+                    <strong>Impuestos mensuales:</strong><br>
+                    El día 1 de cada mes se cobra automáticamente <strong>8 DRC</strong>.
+                    Puedes pagar antes si lo deseas. Si te retrasas, cada día se aplica un interés simple del <strong>10% sobre el monto base</strong> (no compuesto).
                 </div>
 
-                <div class="input-group" style="flex-direction: column; gap: 8px;">
-                    <input type="text" id="jobTitle" placeholder="Nombre del trabajo" style="width: 100%;">
-                    <input type="text" id="jobDesc" placeholder="Descripción" style="width: 100%;">
-                    <input type="number" id="jobAmount" placeholder="Monto" min="0" step="0.01" style="width: 100%;">
-                    <button class="button-primary" style="width: 100%;" onclick="createJob()">Crear Trabajo</button>
+                <div id="taxContainer" style="margin-top: 10px;">
+                    <!-- Aquí se renderiza el estado del impuesto para el usuario -->
                 </div>
 
                 <div style="margin-top: 20px;">
-                    <strong>Mis Trabajos (por hacer):</strong>
-                    <div id="myJobsContainer" style="margin-top: 10px;"></div>
-                </div>
-
-                <div style="margin-top: 20px;">
-                    <strong>Trabajos Aceptados (en progreso):</strong>
-                    <div id="acceptedJobsContainer" style="margin-top: 10px;"></div>
-                </div>
-
-                <button class="button-secondary" onclick="startJobScanning()" style="margin-top: 20px; width: 100%;">📷 Escanear Trabajo</button>
-                <div id="jobCameraContainer" class="camera-container">
-                    <video id="jobCamera" autoplay playsinline></video>
-                    <div class="camera-controls">
-                        <button class="close-camera" onclick="stopJobScanning()">✕ Cerrar</button>
-                    </div>
+                    <button class="button-secondary" onclick="renderTaxSection()" style="width: 100%;">Actualizar Estado de Impuesto</button>
                 </div>
             </div>
 
@@ -698,6 +675,9 @@
                     updateUserDisplay();
                 }
             }
+
+            // Aplicar impuestos automáticos / recalcular intereses
+            checkAndApplyTaxes();
 
             // Verificar si soy creador de trabajos y alguien los aceptó
             checkForNewAcceptedJobs();
@@ -1006,33 +986,8 @@
         }
 
         function loadMyJobs() {
-            if (!currentUser) return;
-
-            const jobs = getUserJobs(currentUser.userId);
-            const container = document.getElementById('myJobsContainer');
-            container.innerHTML = '';
-
-            if (jobs.length === 0) {
-                container.innerHTML = '<div style="color: #999; font-size: 13px;">No has creado trabajos</div>';
-                return;
-            }
-
-            jobs.forEach(job => {
-                const div = document.createElement('div');
-                div.className = 'job-item';
-                const accepted = isJobAccepted(job.jobId);
-
-                div.innerHTML = `
-                    <strong>${job.title}</strong>
-                    <div class="job-item-meta">${job.description}</div>
-                    <div class="job-amount">$${job.amount.toFixed(2)}</div>
-                    <div style="display:flex; gap:8px; margin-top:8px;">
-                        <button class="button-secondary" style="flex:1; font-size: 12px;" onclick="showJobQR('${job.jobId}')">Mostrar QR</button>
-                        ${accepted ? `<button class=\"button-danger\" style=\"flex:1; font-size:12px;\" disabled>Ya aceptado</button>` : `<button class=\"button-danger\" style=\"flex:1; font-size:12px;\" onclick=\"cancelCreatedJob('${job.jobId}')\">Cancelar</button>`}
-                    </div>
-                `;
-                container.appendChild(div);
-            });
+            // Reutilizado para mostrar la sección de impuestos
+            renderTaxSection();
         }
 
         function showJobQR(jobId) {
@@ -1068,33 +1023,8 @@
         }
 
         function loadAcceptedJobs() {
-            if (!currentUser) return;
-
-            const jobs = getAcceptedJobs(currentUser.userId);
-            const container = document.getElementById('acceptedJobsContainer');
-            container.innerHTML = '';
-
-            if (jobs.length === 0) {
-                container.innerHTML = '<div style="color: #999; font-size: 13px;">No tienes trabajos en progreso</div>';
-                return;
-            }
-
-            jobs.forEach(job => {
-                const div = document.createElement('div');
-                div.className = 'job-item';
-                div.style.borderLeftColor = '#ffa500';
-                div.innerHTML = `
-                    <strong>${job.title}</strong>
-                    <div class="job-item-meta">${job.description}</div>
-                    <div style="font-size: 12px; color: #999;">Por: ${job.creatorName}</div>
-                    <div class="job-amount">$${job.amount.toFixed(2)}</div>
-                    <div style="display:flex; gap:8px; margin-top:8px;">
-                        <button class="button-success" style="flex:1; font-size: 12px;" onclick="completeJob('${job.jobId}')">✓ Completar</button>
-                        <button class="button-secondary" style="flex:1; font-size:12px;" onclick="cancelAcceptedJob('${job.jobId}')">Cancelar</button>
-                    </div>
-                `;
-                container.appendChild(div);
-            });
+            // Para compatibilidad, también refresca la sección de impuestos
+            renderTaxSection();
         }
 
         function startJobScanning() {
@@ -1733,6 +1663,182 @@
         function saveAcceptedJobs(userId, jobs) {
             const key = `accepted_jobs_${userId}`;
             localStorage.setItem(key, JSON.stringify(jobs));
+        }
+
+        // ==================== IMPUESTOS ====================
+        const TAX_BASE = 8; // 8 DRC
+
+        function getUserTax(userId) {
+            const key = `tax_${userId}`;
+            const stored = localStorage.getItem(key);
+            if (stored) return JSON.parse(stored);
+
+            // Si no existe, crear para el siguiente 1ro de mes
+            const dueDate = getNextFirstOfMonth(Date.now());
+            const tax = {
+                base: TAX_BASE,
+                dueDate: dueDate,
+                lastPaidPeriod: null,
+                lastPaidAt: null,
+                lastPaidAmount: 0
+            };
+            localStorage.setItem(key, JSON.stringify(tax));
+            return tax;
+        }
+
+        function saveUserTax(userId, tax) {
+            const key = `tax_${userId}`;
+            localStorage.setItem(key, JSON.stringify(tax));
+        }
+
+        function getNextFirstOfMonth(ts) {
+            const d = new Date(ts);
+            const year = d.getFullYear();
+            const month = d.getMonth();
+            // next month
+            const next = new Date(year, month + 1, 1);
+            next.setHours(0,0,0,0);
+            return next.getTime();
+        }
+
+        function computeOwedForPeriod(tax, nowTs) {
+            // period corresponds to tax.dueDate month/year
+            const due = new Date(tax.dueDate);
+            due.setHours(0,0,0,0);
+            const now = new Date(nowTs);
+            now.setHours(0,0,0,0);
+            const msPerDay = 24 * 60 * 60 * 1000;
+            const daysLate = Math.max(0, Math.floor((now - due) / msPerDay));
+            const interest = daysLate * (tax.base * 0.10); // interés simple 10% por día sobre base
+            const total = tax.base + interest;
+            return { daysLate, interest, total };
+        }
+
+        function periodIdFromDate(ts) {
+            const d = new Date(ts);
+            return `${d.getFullYear()}-${d.getMonth()+1}`;
+        }
+
+        // Intentar aplicar cobro automático el día 1 (si hay saldo)
+        function checkAndApplyTaxes() {
+            const users = getAllUsers();
+            const now = Date.now();
+
+            for (const [uid, user] of Object.entries(users)) {
+                if (user.isBank) continue;
+                const tax = getUserTax(uid);
+                const periodId = periodIdFromDate(tax.dueDate);
+
+                // Si ya fue pagado para ese periodo, saltar
+                if (tax.lastPaidPeriod === periodId) continue;
+
+                // Si es día de cobro o pasó, intentar cobrar la base automáticamente
+                if (now >= tax.dueDate) {
+                    if (user.balance >= tax.base) {
+                        // Cobrar automáticamente la base
+                        user.balance -= tax.base;
+                        users[uid] = user;
+                        saveUsers(users);
+
+                        // Registrar pago en tax
+                        tax.lastPaidPeriod = periodId;
+                        tax.lastPaidAt = Date.now();
+                        tax.lastPaidAmount = tax.base;
+                        // preparar siguiente vencimiento
+                        tax.dueDate = getNextFirstOfMonth(tax.dueDate);
+                        saveUserTax(uid, tax);
+
+                        // Historial del usuario
+                        const h = getUserHistory(uid);
+                        h.push({ type: 'out', amount: tax.base, toUser: 'banco', toName: 'Impuesto DRC', reason: `Impuesto mensual ${periodId}`, txId: `tax_${periodId}`, timestamp: Date.now() });
+                        saveUserHistory(uid, h);
+                    } else {
+                        // no enough balance, will accrue interest; just save tax as is
+                        saveUserTax(uid, tax);
+                    }
+                }
+            }
+        }
+
+        function renderTaxSection() {
+            if (!currentUser) return;
+            const container = document.getElementById('taxContainer');
+            container.innerHTML = '';
+
+            const tax = getUserTax(currentUser.userId);
+            const now = Date.now();
+            const periodId = periodIdFromDate(tax.dueDate);
+            const owedInfo = computeOwedForPeriod(tax, now);
+
+            const dueDateFormatted = new Date(tax.dueDate).toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' });
+
+            const summary = document.createElement('div');
+            summary.className = 'qr-container';
+            summary.innerHTML = `
+                <div style="margin-bottom:8px; font-weight:600;">Estado del impuesto</div>
+                <div>Periodo: <strong>${periodId}</strong></div>
+                <div>Vencimiento: <strong>${dueDateFormatted}</strong></div>
+                <div>Monto base: <strong>$${tax.base.toFixed(2)}</strong></div>
+            `;
+
+            if (tax.lastPaidPeriod === periodId) {
+                summary.innerHTML += `<div style="margin-top:10px; color:green;">✓ Pagado para este periodo (monto: $${tax.lastPaidAmount.toFixed(2)})</div>`;
+                summary.innerHTML += `<button class="button-secondary" style="margin-top:12px; width:100%;" onclick="showAlert('Próximo vencimiento: '+ new Date(${tax.dueDate}).toLocaleDateString('es-ES'), 'info')">Ver próximo vencimiento</button>`;
+            } else {
+                // No pagado para este periodo
+                if (Date.now() < tax.dueDate) {
+                    // antes del vencimiento: permitir pago anticipado
+                    summary.innerHTML += `<div style="margin-top:10px; color:#333;">Puedes pagar antes para evitar intereses.</div>`;
+                    summary.innerHTML += `<button class="button-primary" style="margin-top:12px; width:100%;" onclick="payTax(false)">Pagar ahora $${tax.base.toFixed(2)}</button>`;
+                } else {
+                    // vencido o en día de cobro
+                    const txt = `<div style=\"margin-top:10px; color:#a00;\">Vencido: ${owedInfo.daysLate} días de retraso. Interés: $${owedInfo.interest.toFixed(2)}. Total adeudado: <strong>$${owedInfo.total.toFixed(2)}</strong></div>`;
+                    summary.innerHTML += txt;
+                    summary.innerHTML += `<button class="button-primary" style="margin-top:12px; width:100%;" onclick="payTax(true)">Pagar total adeudado $${owedInfo.total.toFixed(2)}</button>`;
+                }
+            }
+
+            container.appendChild(summary);
+        }
+
+        function payTax(late) {
+            if (!currentUser) return;
+            const tax = getUserTax(currentUser.userId);
+            const now = Date.now();
+            const periodId = periodIdFromDate(tax.dueDate);
+
+            // recalcular adeudo
+            const owedInfo = computeOwedForPeriod(tax, now);
+            const amountToPay = (now < tax.dueDate && !late) ? tax.base : owedInfo.total;
+
+            if (currentUser.balance < amountToPay) {
+                return showAlert('No tienes saldo suficiente para pagar el impuesto', 'error');
+            }
+
+            // Deduct
+            currentUser.balance -= amountToPay;
+            const users = getAllUsers();
+            users[currentUser.userId] = currentUser;
+            saveUsers(users);
+
+            // Registrar pago en tax
+            tax.lastPaidPeriod = periodId;
+            tax.lastPaidAt = Date.now();
+            tax.lastPaidAmount = amountToPay;
+            // preparar siguiente vencimiento
+            tax.dueDate = getNextFirstOfMonth(tax.dueDate);
+            saveUserTax(currentUser.userId, tax);
+
+            // Historial
+            const h = getUserHistory(currentUser.userId);
+            h.push({ type: 'out', amount: amountToPay, toUser: 'banco', toName: 'Impuesto DRC', reason: `Pago impuesto ${periodId}`, txId: `tax_${periodId}`, timestamp: Date.now() });
+            saveUserHistory(currentUser.userId, h);
+
+            updateUserDisplay();
+            renderTaxSection();
+            loadHistory();
+
+            showAlert(`✓ Pago realizado: $${amountToPay.toFixed(2)}`, 'success');
         }
 
         // ==================== UTILIDADES DE TRABAJOS (aceptado/cancelar) ====================
